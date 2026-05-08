@@ -2,77 +2,117 @@
 #include <iostream>
 
 #include "Player.h"
+#include "TextureHolder.h"
 #include "ZombieArena.h"
 
 int main()
 {
 	// =========================== =========================//
 	//														// 
-	//						GAME LOGIC						//
+	//					Game window & Views	 				//
 	//														//
 	// =========================== =========================//
-	enum class GameState { PAUSED, LEVELING_UP, GAME_OVER, PLAYING };
-	GameState state = GameState::LEVELING_UP;
-
-	std::vector<int> mesNombres;
-
-	sf::Vector2f resolution {0.f, 0.f};
+	// Get the desktop resolution and create the game window with that resolution
+	sf::Vector2f resolution{ 0.f, 0.f };
 	resolution.x = sf::VideoMode::getDesktopMode().width;
 	resolution.y = sf::VideoMode::getDesktopMode().height;
-
 	sf::RenderWindow window(sf::VideoMode(resolution.x, resolution.y), "Zombie Arena", sf::Style::Default);
-	window.setPosition(sf::Vector2i(-9, 0)); // décalage de 9 pixels pour compenser la bordure du bureau windows
-	sf::Event event;
+	window.setPosition(sf::Vector2i(-9, 0)); // Repositioning window by 9 pixels to compensate for the Windows desktop border
+	sf::Event event; // Event object to hold the events polled from the window
 
+	// Create the main view with the same size as the resolution of the window
 	sf::View mainView(sf::FloatRect(0, 0, resolution.x, resolution.y));
 
-	sf::Clock clock;
-	sf::Time gameTimeTotal;
-	sf::Time deltaTime;
-	float dtAsSeconds;
-
+	// Vectors to hold the mouse position in world coordinates and screen coordinates, and the player position in world coordinates
 	sf::Vector2f mouseWorldPosition;
 	sf::Vector2i mouseScreenPosition;
-	sf::Vector2f playerPosition;
 
-	Player player;
 
+		// Places all controlers befor using them in order to avoid undefined behavior
+		// Textures manager, sound manager, entities manager and font manager are all created before the game loop to load and hold all the resources for the game
+		// and to avoid loading them multiple times during the game loop which would cause performance issues and memory leaks
+		
+
+	// =========================== =========================//
+	//														// 
+	//						  Textures						//
+	//														//
+	// =========================== =========================//
+	TextureHolder textureHolder; // Create the texture holder object, which will be used to load and hold all the textures for the game
+	
+	sf::Texture textureBackground{ textureHolder.GetTexture("Res/Textures/background_sheet.png") };
+
+	// Create the background vertex array, which will be used to draw the background of the arena
 	sf::VertexArray backgroundVA;
 
-	// Initial size of the arena, which will be updated later based on the level up screen choices
-	sf::IntRect arena{ 0,0,500,300 };
 
 	// =========================== =========================//
 	//														// 
-	//						Textures						//
+	//							Audio						// 
 	//														//
 	// =========================== =========================//
-	sf::Texture textureBackground;
-	if(!textureBackground.loadFromFile("Res/Textures/background_sheet.png"))
-		std::cerr << "Error loading background texture in main.cpp" << std::endl;
+
+
+
 
 	// =========================== =========================//
 	//														// 
-	//							Audio						//
+	//							Entities					//
 	//														//
 	// =========================== =========================//
-	
+		// Player use TextureHolder to load and hold the texture for the player,
+		// so we need to create the TextureHolder before creating the player
+		
+	// Create the player object
+	Player player; 
+
+	sf::Vector2f playerPosition;
+
+	// Create the horde of zombies, which will be updated later based on the level up screen choices
+	int numZombies{ 10 };
+	int numZombiesAlive{ numZombies };
+	Zombie* zombies = nullptr;
+
 
 	// =========================== =========================//
 	//														// 
 	//							Texts						//
 	//														//
 	// =========================== =========================//
+
+
+	// =========================== =========================//
+	//														// 
+	//							Time						//
+	//														//
+	// =========================== =========================//
+	// // Time related variables to control the time it takes to update and render each frame, and to keep track of the total game time
+	sf::Clock clock;
+	sf::Time gameTimeTotal;
+	sf::Time deltaTime;
+	float dtAsSeconds;
+
+
+	// =========================== =========================//
+	//														// 
+	//						Game Logic						//
+	//														//
+	// =========================== =========================//
+	enum class GameState { PAUSED, LEVELING_UP, GAME_OVER, PLAYING }; // states of the game, used to control the flow of the game and what actions are allowed in each state
+	GameState state = GameState::LEVELING_UP; // first state of the game
+		
+	// Initial size of the arena, which will be updated later based on the level up screen choices
+	sf::IntRect arena{ 0,0,500,300 };
 	
 
 	// =========================== =========================//
 	//														// 
-	//						  GAME LOOP						//
+	//						  Game Loop						//
 	//														//
 	// =========================== =========================//
 	while (window.isOpen())
 	{
-		// =========================== Window Poll Events =========================//
+		// ====================================================== Window Poll Events ====================================================//
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
@@ -101,7 +141,9 @@ int main()
 			}
 		}
 
-		// =========================== Handle INPUT =========================//
+
+
+		// ====================================================== Handle INPUT ====================================================//
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
 			window.close();
 
@@ -166,13 +208,19 @@ int main()
 
 				// Spawn the player in the middle of the arena with the correct tile size and resolution
 				player.Spawn(arena, resolution, tileSize);
+				
+				// Create the horde of zombies
+				delete[] zombies; // Delete the previous horde of zombies (if exist) to prevent memory leaks
+				zombies = createHorde(numZombies, arena);
 
 				// Reset the clock so there isn't a jump in time when resuming the game
 				clock.restart(); 
 			}
 		}
 
-		// =========================== Update game =========================//
+
+
+		// ====================================================== Update game ====================================================//
 		if (state == GameState::PLAYING)
 		{	
 			// Update the delta time with the time it took to update and render the last frame
@@ -197,17 +245,31 @@ int main()
 
 			// Align the main view with the player's position, but only if we are in the playing state
 			mainView.setCenter(playerPosition);
+
+			// Update the zombies, but only if we are in the playing state
+			for (size_t i { 0 }; i < numZombies; i++)
+			{
+				if (zombies[i].isAlive())
+					zombies[i].update(dtAsSeconds, playerPosition);
+			}
 		}
 
 
-		// =========================== RENDER & DRAW=========================//
 
+		// ====================================================== Render & Draw ====================================================//
 		if (state == GameState::PLAYING)
 		{
 			window.clear(sf::Color(16, 16, 16, 255));
 			window.setView(mainView);
 			window.draw(backgroundVA, &textureBackground);
 			window.draw(player.getSprite());
+
+			// Draw the zombies, but only if we are in the playing state
+			for (size_t i { 0 }; i < numZombies; i++)
+			{
+				if (zombies[i].isAlive())
+					window.draw(zombies[i].getSprite());
+			}
 		}
 		else if(state == GameState::LEVELING_UP)
 		{
@@ -224,7 +286,9 @@ int main()
 
 		window.display();
 	}
-	//system("PAUSE");
+
+	// ====================================================== Clean memory & exit ====================================================//
+	delete[] zombies; // Delete the horde of zombies to prevent memory leaks
 
 	return 0;
 }

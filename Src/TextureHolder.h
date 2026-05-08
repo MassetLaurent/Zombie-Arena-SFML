@@ -7,7 +7,7 @@ class TextureHolder
 {
 private:
 	// Create a map of textures so we can associate a name with each texture
-	std::map<std::string, sf::Texture> m_Textures;
+	std::map<std::string, sf::Texture> m_TexturesMap;
 
 	// Pointer to the single instance of TextureHolder itself
 	static TextureHolder* m_s_Instance;

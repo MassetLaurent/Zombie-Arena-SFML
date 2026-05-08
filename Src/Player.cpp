@@ -1,12 +1,18 @@
 #include <iostream>
+
 #include "Player.h"
+#include "TextureHolder.h"
 
 Player::Player() : m_speed(START_SPEED), m_health(START_HEALTH), m_maxHealth(START_HEALTH)
 {
+
 	if (!m_texture.loadFromFile("Res/Textures/player.png"))
 		std::cerr << "Error loading player texture" << std::endl;
 
 	m_sprite.setTexture(m_texture);
+
+	m_sprite.setTexture(TextureHolder::GetTexture("Res/Textures/player.png"));
+
 	m_sprite.setOrigin(25.0f, 25.0f);
 
 	m_position = sf::Vector2f(50.0f, 50.0f);
@@ -75,14 +81,14 @@ void Player::update(float elapsedTime, sf::Vector2i mousePosition)
 	m_sprite.setPosition(m_position);
 
 	// Check if player is outside of arena and correct
-	if (m_position.x > m_arena.width - m_tileSize)
-		m_position.x = m_arena.width - m_tileSize;
-	if (m_position.x < m_arena.left + m_tileSize)
-		m_position.x = m_arena.left + m_tileSize;
-	if (m_position.y > m_arena.height - m_tileSize)
-		m_position.y = m_arena.height - m_tileSize;
-	if (m_position.y < m_arena.top + m_tileSize)
-		m_position.y = m_arena.top + m_tileSize;
+	if (m_position.x > m_arena.width - m_tileSize - m_sprite.getGlobalBounds().width / 4)
+		m_position.x = m_arena.width - m_tileSize - m_sprite.getGlobalBounds().width / 4;
+	if (m_position.x < m_arena.left + m_tileSize + m_sprite.getGlobalBounds().width / 4)
+		m_position.x = m_arena.left + m_tileSize + m_sprite.getGlobalBounds().width / 4;
+	if (m_position.y > m_arena.height - m_tileSize - m_sprite.getGlobalBounds().height / 4)
+		m_position.y = m_arena.height - m_tileSize - m_sprite.getGlobalBounds().height / 4;
+	if (m_position.y < m_arena.top + m_tileSize + m_sprite.getGlobalBounds().height / 4)
+		m_position.y = m_arena.top + m_tileSize + m_sprite.getGlobalBounds().height / 4;
 
 	// Calculate the angle in radians between the player and the mouse position
 	float angle = atan2(mousePosition.y - (m_resolution.y / 2), mousePosition.x - (m_resolution.x / 2));

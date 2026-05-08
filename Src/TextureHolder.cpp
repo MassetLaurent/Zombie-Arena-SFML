@@ -17,7 +17,7 @@ TextureHolder::TextureHolder()
 sf::Texture& TextureHolder::GetTexture(std::string const& filename)
 {
 	// Get a reference to the static instance of TextureHolder
-	std::map<std::string, sf::Texture>& texturesMap {m_s_Instance->m_Textures};
+	std::map<std::string, sf::Texture>& texturesMap {m_s_Instance->m_TexturesMap};
 
 	auto keyValuePair {texturesMap.find(filename)};
 
