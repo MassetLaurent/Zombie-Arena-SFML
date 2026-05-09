@@ -24,6 +24,7 @@ private:
 
 	//Sprite for the zombie
 	sf::Sprite m_sprite;
+	sf::RectangleShape m_life;
 
 	// How fast is the zombie
 	float m_speed;
@@ -46,11 +47,12 @@ public:
 
 	
 	// Getters for the zombie's data members
-	sf::FloatRect	getPosition() const		{ return m_sprite.getGlobalBounds(); }
-	sf::Sprite		getSprite() const		{ return m_sprite; } // Get the sprite of the zombie, which will be used to draw it on the screen
-	sf::Vector2f	getCenter() const		{ return m_position; }
-	float			getRotation() const		{ return m_sprite.getRotation(); }
-	bool			isAlive() const			{ return m_alive; }
+	sf::FloatRect		getPosition() const		{ return m_sprite.getGlobalBounds(); }
+	sf::Sprite			getSprite() const { return m_sprite; } // Get the sprite of the zombie, which will be used to draw it on the screen
+	sf::RectangleShape	getLifeShape() const { return m_life; } // Get the sprite of the zombie, which will be used to draw it on the screen
+	sf::Vector2f		getCenter() const		{ return m_position; }
+	float				getRotation() const		{ return m_sprite.getRotation(); }
+	bool				isAlive() const			{ return m_alive; }
 
 	// Update the zombie's each frame, making it move towards the player and rotate to face the player
 	void update(float deltaTime, sf::Vector2f playerPosition);

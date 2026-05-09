@@ -1,13 +1,22 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <sstream>
 
 #include "Bullet.h"
+#include "Pickup.h"
 #include "Player.h"
 #include "TextureHolder.h"
 #include "ZombieArena.h"
 
 int main()
 {
+	// =========================== =========================//
+	//														// 
+	//							Constants 					//
+	//														//
+	// =========================== =========================//
+	const int HUD_OFFSET{ 50 };
+	
 	// =========================== =========================//
 	//														// 
 	//					Game window & Views	 				//
@@ -23,11 +32,28 @@ int main()
 	sf::Event event; // Event object to hold the events polled from the window
 
 	// Create the main view with the same size as the resolution of the window
-	sf::View mainView(sf::FloatRect(0, 0, resolution.x, resolution.y));
+	sf::View gameView	(sf::FloatRect(0, 0, resolution.x, resolution.y));
+	sf::View hudView	(sf::FloatRect(0, 0, resolution.x, resolution.y));
 
 	// Vectors to hold the mouse position in world coordinates and screen coordinates, and the player position in world coordinates
 	sf::Vector2f mouseWorldPosition;
 	sf::Vector2i mouseScreenPosition;
+
+	// =========================== =========================//
+	//														// 
+	//						Game Logic						//
+	//														//
+	// =========================== =========================//
+	const int KILL_POINTS{ 10 }; // How much score point get granted when kill a zombie
+	enum class GameState { PAUSED, LEVELING_UP, GAME_OVER, PLAYING }; // states of the game, used to control the flow of the game and what actions are allowed in each state
+	GameState state = GameState::LEVELING_UP; // first state of the game
+
+	// Initial size of the arena, which will be updated later based on the level up screen choices
+	sf::IntRect arena{ 0,0,1000,700 };
+
+	int score	{ 0 };
+	int hiScore	{ 0 };
+	int wave	{ 1 };
 
 
 		// Places all controlers befor using them in order to avoid undefined behavior
@@ -49,8 +75,18 @@ int main()
 	crosshairSprite.setOrigin(25.f,25.f);
 	crosshairSprite.setPosition(10.f,10.f);
 
+	sf::Sprite gameOverSprite;
+	gameOverSprite.setTexture(textureHolder.GetTexture("Res/Textures/background.png"));
+	gameOverSprite.setPosition(0, 0);
+	gameOverSprite.setScale({resolution.x / gameOverSprite.getTextureRect().width, resolution.y / gameOverSprite.getTextureRect().height });
+
+	sf::Sprite ammoIcon;
+	ammoIcon.setTexture(textureHolder.GetTexture("Res/Textures/ammo_icon.png"));
+	ammoIcon.setPosition(HUD_OFFSET, resolution.y - 150);
+
 	// Create the background vertex array, which will be used to draw the background of the arena
 	sf::VertexArray backgroundVA;
+
 
 
 	// =========================== =========================//
@@ -59,9 +95,22 @@ int main()
 	//														//
 	// =========================== =========================//
 
+		
+	
+	// =========================== =========================//
+	//														// 
+	//							Time						//
+	//														//
+	// =========================== =========================//
+	// // Time related variables to control the time it takes to update and render each frame, and to keep track of the total game time
+	sf::Clock clock;
+	sf::Time gameTimeTotal;
+	sf::Time deltaTime;
+	float dtAsSeconds				{ 0.f };
+	float timeSinceLastHudUpdate	{ 0.f };
 
 
-
+	
 	// =========================== =========================//
 	//														// 
 	//							Entities					//
@@ -69,9 +118,9 @@ int main()
 	// =========================== =========================//
 		// Player use TextureHolder to load and hold the texture for the player,
 		// so we need to create the TextureHolder before creating the player
-		
+
 	// Create the player object
-	Player player; 
+	Player player;
 
 	sf::Vector2f playerPosition;
 
@@ -83,43 +132,110 @@ int main()
 	// Ammo and shooting related variables
 	const int BULLETS_ARRAY_SIZE{ 50 };	// Maximum number of bullets that can be in flight at the same time, which will be used to control the shooting of the bullets and to prevent memory leaks
 	Bullet bullets[BULLETS_ARRAY_SIZE];	// Create an array of bullets, which will be used to shoot the zombies
-	int currentBullet	{ 0 };				// Index of the current bullet in the bullets array, which will be used to shoot the zombies
-	int bulletsSpare	{ 24 };				// Number of bullets spare to reload (6 magazines of 4 bullets each) (6/24)
-	int bulletsInClip	{ 6 };				// Number of bullets currently in the clip, which will be used to control the shooting of the bullets
-	const int clipSize	{ 6 };				// Number of bullets in each magazine
-	float fireRate		{ 1.f };			// Time in seconds between each shot
-	sf::Time lastShot;						// Time when the last shot was fired, which will be used to control the fire rate of the bullets
+	int currentBullet{ 0 };				// Index of the current bullet in the bullets array, which will be used to shoot the zombies
+	int bulletsSpare{ 24 };				// Number of bullets spare to reload (6 magazines of 4 bullets each) (6/24)
+	int bulletsInClip{ 6 };				// Number of bullets currently in the clip, which will be used to control the shooting of the bullets
+	int clipSize{ 6 };					// Number of bullets in each magazine
+	float fireRate{ 0.3f };				// Time in seconds between each shot
+	sf::Time lastShot;					// Time when the last shot was fired, which will be used to control the fire rate of the bullets
+
+	//Pickups
+	const int NUM_OF_PICKUPS{ 2 };
+	Pickup healthPickup(1);
+	Pickup ammoPickup(2);
+
+
 
 	// =========================== =========================//
 	//														// 
 	//							Texts						//
 	//														//
 	// =========================== =========================//
+	const int HUD_TEXT_SIZE{ 35 };
+
+	sf::Font font;
+	if (!font.loadFromFile("Res/Fonts/font.ttf"))
+		std::cerr << "Load font error from main.cpp : Texts section." << std::endl;
+
+	// ====================================================== Game States ======================================================//
+	sf::Text pausedText;
+	pausedText.setFont(font);
+	pausedText.setCharacterSize(70);
+	pausedText.setFillColor(sf::Color::Yellow);
+	pausedText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
+	pausedText.setString("		PAUSED ! \n\npress Enter to continue !");
+
+	sf::Text gameOverText;
+	gameOverText.setFont(font);
+	gameOverText.setCharacterSize(70);
+	gameOverText.setFillColor(sf::Color::Red);
+	gameOverText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
+	gameOverText.setString("		GAME OVER ! \n\npress Enter to continue !");
+
+	sf::Text levelUpText;
+	levelUpText.setFont(font);
+	levelUpText.setCharacterSize(25);
+	levelUpText.setFillColor(sf::Color::Green);
+	levelUpText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
+	std::stringstream levelUpSs;
+	levelUpSs << "		UPGRADES !\nchoose with numpad\n\n\n\n"
+		"1. Increase rate of fire \n\n" <<
+		"2. Increase clip size (next reload) \n\n" <<
+		"3. Increase max health\n\n" <<
+		"4. Increase run speed\n\n" <<
+		"5. More and better health pickups \n\n" <<
+		"6. More and better ammo pickups\n\n";
+
+	levelUpText.setString(levelUpSs.str());
 
 
-	// =========================== =========================//
-	//														// 
-	//							Time						//
-	//														//
-	// =========================== =========================//
-	// // Time related variables to control the time it takes to update and render each frame, and to keep track of the total game time
-	sf::Clock clock;
-	sf::Time gameTimeTotal;
-	sf::Time deltaTime;
-	float dtAsSeconds;
+	// ====================================================== HUD elements ======================================================//
+	sf::Text ammoText;
+	ammoText.setFont(font);
+	ammoText.setCharacterSize(HUD_TEXT_SIZE);
+	ammoText.setFillColor(sf::Color::White);
+	std::stringstream ammoTextSs;
+	ammoTextSs << bulletsInClip << "/" << bulletsSpare;
+	ammoText.setString(ammoTextSs.str());
+	ammoText.setPosition(ammoIcon.getPosition().x + 50.f, ammoIcon.getPosition().y + 7.f);
+
+	sf::Text scoreText;
+	scoreText.setFont(font);
+	scoreText.setCharacterSize(HUD_TEXT_SIZE);
+	scoreText.setFillColor(sf::Color::White);
+	std::stringstream scoreTextSs;
+	scoreTextSs <<  "Score : " << score;
+	scoreText.setString(scoreTextSs.str());
+	scoreText.setPosition(HUD_OFFSET, 10);
+
+	sf::Text hiScoreText;
+	hiScoreText.setFont(font);
+	hiScoreText.setCharacterSize(HUD_TEXT_SIZE);
+	hiScoreText.setFillColor(sf::Color::White);
+	std::stringstream hiScoreSs;
+	hiScoreSs << "High score : " << hiScore;
+	hiScoreText.setString(hiScoreSs.str());
+	hiScoreText.setPosition(resolution.x - hiScoreText.getLocalBounds().width - HUD_OFFSET, 10);
+
+	sf::Text zombiesRemainingText;
+	zombiesRemainingText.setFont(font);
+	zombiesRemainingText.setCharacterSize(HUD_TEXT_SIZE);
+	zombiesRemainingText.setFillColor(sf::Color::White);
+	std::stringstream zombiesRemainingSs;
+	zombiesRemainingSs << "zombies remaining : " << numZombiesAlive;
+	zombiesRemainingText.setString(zombiesRemainingSs.str());
+	zombiesRemainingText.setPosition(ammoText.getGlobalBounds().left + ammoText.getGlobalBounds().width + HUD_OFFSET, ammoText.getPosition().y);
+
+	sf::Text waveText;
+	waveText.setFont(font);
+	waveText.setCharacterSize(HUD_TEXT_SIZE);
+	waveText.setFillColor(sf::Color::White);
+	std::stringstream waveSs;
+	waveSs << "Wave : " << wave;
+	waveText.setString(waveSs.str());
+	waveText.setPosition(resolution.x - waveText.getGlobalBounds().width - HUD_OFFSET, ammoText.getPosition().y);
 
 
-	// =========================== =========================//
-	//														// 
-	//						Game Logic						//
-	//														//
-	// =========================== =========================//
-	enum class GameState { PAUSED, LEVELING_UP, GAME_OVER, PLAYING }; // states of the game, used to control the flow of the game and what actions are allowed in each state
-	GameState state = GameState::LEVELING_UP; // first state of the game
-		
-	// Initial size of the arena, which will be updated later based on the level up screen choices
-	sf::IntRect arena{ 0,0,1000,700 };
-	
 
 	// =========================== =========================//
 	//														// 
@@ -154,12 +270,12 @@ int main()
 				{
 					if (event.key.code == sf::Keyboard::R)
 					{
-						if (bulletsSpare >= clipSize)
+						if (bulletsSpare >= clipSize && bulletsInClip < clipSize)
 						{
+							bulletsSpare -= clipSize-bulletsInClip;
 							bulletsInClip = clipSize;
-							bulletsSpare -= clipSize;
 						}
-						else if (bulletsSpare > 0)
+						else if (bulletsSpare > 0 && bulletsInClip < clipSize)
 						{
 							bulletsInClip = bulletsSpare;
 							bulletsSpare = 0;
@@ -260,8 +376,13 @@ int main()
 				player.Spawn(arena, resolution, tileSize);
 				
 				// Create the horde of zombies
+				numZombiesAlive = numZombies;
 				delete[] zombies; // Delete the previous horde of zombies (if exist) to prevent memory leaks
 				zombies = createHorde(numZombies, arena);
+
+				// actualise pickups arena
+				healthPickup.setArena(arena);
+				ammoPickup.setArena(arena);
 
 				// Reset the clock so there isn't a jump in time when resuming the game
 				clock.restart(); 
@@ -285,7 +406,7 @@ int main()
 			mouseScreenPosition = sf::Mouse::getPosition(window);
 
 			// Convert the mouse position to world coordinates
-			mouseWorldPosition = window.mapPixelToCoords(mouseScreenPosition, mainView);
+			mouseWorldPosition = window.mapPixelToCoords(mouseScreenPosition, gameView);
 
 			// Record the player's position
 			playerPosition = player.getCenter(); 
@@ -294,7 +415,7 @@ int main()
 			player.update(dtAsSeconds, mouseScreenPosition);
 
 			// Align the main view with the player's position, but only if we are in the playing state
-			mainView.setCenter(playerPosition);
+			gameView.setCenter(playerPosition);
 
 			crosshairSprite.setPosition(mouseWorldPosition);
 			// Update the zombies, but only if we are in the playing state
@@ -310,44 +431,185 @@ int main()
 				if(bullets[i].isInFlight())
 					bullets[i].update(dtAsSeconds);
 			}
+
+			// update TimeToLive || TimeToWait for pickups
+			healthPickup.update(dtAsSeconds);
+			ammoPickup.update(dtAsSeconds);
+
+			// Collision detection for all entities
+				// Zombie got shot by a bullet ?
+			for (size_t i{ 0 }; i < BULLETS_ARRAY_SIZE; i++)
+			{
+				for (size_t j{ 0 }; j < numZombies; j++)
+				{
+					if (bullets[i].isInFlight() && zombies[j].isAlive())
+					{
+						// Collision check
+						if (bullets[i].getPosition().intersects(zombies[j].getPosition()))
+						{
+							// Stop the bullet to fly
+							bullets[i].stop();
+							// hit the zombie
+							if (zombies[j].hit())
+							{
+								score += KILL_POINTS;
+
+								if (score > hiScore)
+									hiScore = score;
+
+								numZombiesAlive--;
+
+								if (numZombiesAlive == 0)
+								{
+									state = GameState::LEVELING_UP;
+									wave++;
+									numZombies += 2;
+								}
+							}
+						}
+
+					}
+				}
+			}
+
+			// Collision detection between player & pickups
+			if (player.getPosition().intersects(ammoPickup.getPosition()) && ammoPickup.isSpawned())
+				bulletsSpare += ammoPickup.gotIt();
+
+			if (player.getPosition().intersects(healthPickup.getPosition()) && healthPickup.isSpawned())
+				player.heal(healthPickup.gotIt());
+
+			// Collision detection between player & zombies
+			for (size_t i{ 0 }; i < numZombies; i++)
+			{
+				if (player.getPosition().intersects(zombies[i].getPosition()) && zombies[i].isAlive())
+				{
+					if (player.hit(gameTimeTotal))
+					{
+
+					}
+					if (player.getHealth() <= 0)
+					{
+						state = GameState::GAME_OVER;
+					}
+				}
+			}
+
+			// ============= HUD Update ============= //
+			timeSinceLastHudUpdate += dtAsSeconds;
+
+			if (timeSinceLastHudUpdate > 0.2f)
+			{
+				timeSinceLastHudUpdate = 0;
+
+				ammoTextSs.str("");
+				ammoTextSs << bulletsInClip << "/" << bulletsSpare;
+				ammoText.setString(ammoTextSs.str());
+
+				zombiesRemainingSs.str("");
+				zombiesRemainingSs << "zombies remaining : " << numZombiesAlive;
+				zombiesRemainingText.setString(zombiesRemainingSs.str());
+
+				scoreTextSs.str("");
+				scoreTextSs << "Score : " << score;
+				scoreText.setString(scoreTextSs.str());
+
+				waveSs.str("");
+				waveSs << "Wave : " << wave;
+				waveText.setString(waveSs.str());
+
+				hiScoreSs.str("");
+				hiScoreSs << "High Score : " << hiScore;
+				hiScoreText.setString(hiScoreSs.str());
+			}
 		}
 
+		if (state == GameState::LEVELING_UP)
+		{
+		}
 
+		if (state == GameState::GAME_OVER)
+		{
+			wave = 1;
+			numZombies = 10;
+			numZombiesAlive = numZombies;
+			player.heal(100);
+			clipSize		=	6;
+			bulletsInClip	=	clipSize;
+			bulletsSpare	=	24;
+		}
 
 		// ====================================================== Render & Draw ====================================================//
 		if (state == GameState::PLAYING)
 		{
 			window.clear(sf::Color(16, 16, 16, 255));
-			window.setView(mainView);
+			window.setView(gameView);
 			window.draw(backgroundVA, &textureBackground);
-			window.draw(player.getSprite());
-			window.draw(crosshairSprite);
 
 			// Draw the zombies, but only if we are in the playing state
 			for (size_t i { 0 }; i < numZombies; i++)
 			{
-				if (zombies[i].isAlive())
+				if(!zombies[i].isAlive())
 					window.draw(zombies[i].getSprite());
 			}
-
+			for (size_t i{ 0 }; i < numZombies; i++)
+			{
+				if (zombies[i].isAlive())
+				{
+					window.draw(zombies[i].getLifeShape());
+					window.draw(zombies[i].getSprite());
+				}
+			}
 
 			// Draw all the bullets wich are in flight mode
 			for (size_t i{ 0 }; i < BULLETS_ARRAY_SIZE; i++)
 			{
 				if(bullets[i].isInFlight())
 					window.draw(bullets[i].getShape());
-			}			
+			}		
+
+			// Draw pickups if they're spawned
+			if (healthPickup.isSpawned())
+				window.draw(healthPickup.getSprite());
+
+			if (ammoPickup.isSpawned())
+				window.draw(ammoPickup.getSprite());
+
+			window.draw(player.getSprite());
+			window.draw(crosshairSprite);
+
+
+
+				// ==================== HUD ==================//
+			window.setView(hudView);
+			window.draw(player.getHealthBar());
+			window.draw(ammoIcon);
+			window.draw(ammoText);
+			window.draw(waveText);
+			window.draw(scoreText);
+			window.draw(hiScoreText);
+			window.draw(zombiesRemainingText);
+
 		}
 		else if(state == GameState::LEVELING_UP)
 		{
+			window.clear(sf::Color(16, 16, 60, 55));
+			window.setView(hudView);
+			window.draw(levelUpText);
 			// Draw the leveling up screen
 		}
 		else if(state == GameState::PAUSED)
 		{
+			window.setView(hudView);
+			window.draw(pausedText);
 			// Draw the paused screen
 		}
 		else if(state == GameState::GAME_OVER)
 		{
+			window.clear(sf::Color(60, 16, 16, 55));
+			window.setView(hudView);
+			window.draw(gameOverSprite);
+			window.draw(gameOverText);
 			// Draw the game over screen
 		}
 

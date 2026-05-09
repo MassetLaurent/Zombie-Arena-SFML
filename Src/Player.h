@@ -7,12 +7,13 @@ private:
 	const float		START_SPEED = 200.0f;
 	const float		START_HEALTH = 100;
 
-	sf::Texture		m_texture;
-	sf::Sprite		m_sprite;
-	sf::Vector2f	m_position;
-	sf::Vector2f	m_resolution;
-	sf::IntRect		m_arena;
-	sf::Time		m_lastHit;
+	sf::Texture			m_texture;
+	sf::Sprite			m_sprite;
+	sf::Vector2f		m_position		{ 0.f,0.f };
+	sf::Vector2f		m_resolution	{ 0.f,0.f };
+	sf::IntRect			m_arena;
+	sf::RectangleShape	m_healthBar;
+	sf::Time			m_lastHit;
 
 	int				m_tileSize;
 
@@ -35,10 +36,11 @@ public:
 
 	bool hit(sf::Time timeHit);
 
-	sf::Time getLastHitTime() const { return m_lastHit; }
-	sf::FloatRect getPosition() const { return m_sprite.getGlobalBounds(); }
-	sf::Vector2f getCenter() const { return m_position; }
-	sf::Sprite getSprite() const { return m_sprite; }
+	sf::Time getLastHitTime() const			{ return m_lastHit; }
+	sf::FloatRect getPosition() const		{ return m_sprite.getGlobalBounds(); }
+	sf::Vector2f getCenter() const			{ return m_position; }
+	sf::Sprite getSprite() const			{ return m_sprite; }
+	sf::RectangleShape getHealthBar() const { return m_healthBar; }
 
 	float getRotation() const { return m_sprite.getRotation(); }
 

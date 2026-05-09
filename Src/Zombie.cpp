@@ -6,6 +6,8 @@
 
 Zombie::Zombie()
 {
+	m_life.setSize({ 40.f,10.f });
+	m_life.setFillColor(sf::Color::Red);
 }
 
 Zombie::~Zombie()
@@ -89,6 +91,9 @@ void Zombie::update(float deltaTime, sf::Vector2f playerPosition)
 
 	// Update the sprite's position to match the zombie's position
 	m_sprite.setPosition(m_position);
+
+	m_life.setSize({ m_health * 5 ,8.f });
+	m_life.setPosition(m_sprite.getGlobalBounds().left, m_sprite.getGlobalBounds().top - 5.f);
 
 	// Face the zombie towards the player by calculating the angle between the zombie and the player and setting the sprite's rotation to that angle
 	float angle = atan2(playerPosition.y - m_position.y, playerPosition.x - m_position.x) * 180 / 3.14159f; // Calculate the angle in degrees using atan2
