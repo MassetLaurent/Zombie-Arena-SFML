@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 
+#include "Bullet.h"
 #include "Player.h"
 #include "TextureHolder.h"
 #include "ZombieArena.h"
@@ -18,6 +19,7 @@ int main()
 	resolution.y = sf::VideoMode::getDesktopMode().height;
 	sf::RenderWindow window(sf::VideoMode(resolution.x, resolution.y), "Zombie Arena", sf::Style::Default);
 	window.setPosition(sf::Vector2i(-9, 0)); // Repositioning window by 9 pixels to compensate for the Windows desktop border
+	window.setMouseCursorVisible(false);
 	sf::Event event; // Event object to hold the events polled from the window
 
 	// Create the main view with the same size as the resolution of the window
@@ -35,12 +37,17 @@ int main()
 
 	// =========================== =========================//
 	//														// 
-	//						  Textures						//
+	//					 Textures & Sprites			 		//
 	//														//
 	// =========================== =========================//
 	TextureHolder textureHolder; // Create the texture holder object, which will be used to load and hold all the textures for the game
 	
-	sf::Texture textureBackground{ textureHolder.GetTexture("Res/Textures/background_sheet.png") };
+	sf::Texture textureBackground	{ textureHolder.GetTexture("Res/Textures/background_sheet.png") };
+	sf::Texture crosshairTexture	{ textureHolder.GetTexture("Res/Textures/crosshair.png") };
+
+	sf::Sprite crosshairSprite		{ crosshairTexture };
+	crosshairSprite.setOrigin(25.f,25.f);
+	crosshairSprite.setPosition(10.f,10.f);
 
 	// Create the background vertex array, which will be used to draw the background of the arena
 	sf::VertexArray backgroundVA;
@@ -73,6 +80,15 @@ int main()
 	int numZombiesAlive{ numZombies };
 	Zombie* zombies = nullptr;
 
+	// Ammo and shooting related variables
+	const int BULLETS_ARRAY_SIZE{ 50 };	// Maximum number of bullets that can be in flight at the same time, which will be used to control the shooting of the bullets and to prevent memory leaks
+	Bullet bullets[BULLETS_ARRAY_SIZE];	// Create an array of bullets, which will be used to shoot the zombies
+	int currentBullet	{ 0 };				// Index of the current bullet in the bullets array, which will be used to shoot the zombies
+	int bulletsSpare	{ 24 };				// Number of bullets spare to reload (6 magazines of 4 bullets each) (6/24)
+	int bulletsInClip	{ 6 };				// Number of bullets currently in the clip, which will be used to control the shooting of the bullets
+	const int clipSize	{ 6 };				// Number of bullets in each magazine
+	float fireRate		{ 1.f };			// Time in seconds between each shot
+	sf::Time lastShot;						// Time when the last shot was fired, which will be used to control the fire rate of the bullets
 
 	// =========================== =========================//
 	//														// 
@@ -102,7 +118,7 @@ int main()
 	GameState state = GameState::LEVELING_UP; // first state of the game
 		
 	// Initial size of the arena, which will be updated later based on the level up screen choices
-	sf::IntRect arena{ 0,0,500,300 };
+	sf::IntRect arena{ 0,0,1000,700 };
 	
 
 	// =========================== =========================//
@@ -136,7 +152,24 @@ int main()
 
 				if(state == GameState::PLAYING)
 				{
-					
+					if (event.key.code == sf::Keyboard::R)
+					{
+						if (bulletsSpare >= clipSize)
+						{
+							bulletsInClip = clipSize;
+							bulletsSpare -= clipSize;
+						}
+						else if (bulletsSpare > 0)
+						{
+							bulletsInClip = bulletsSpare;
+							bulletsSpare = 0;
+						}
+						else
+						{
+							// No bullets spare to reload
+							std::cout << "No bullets spare to reload!" << std::endl;
+						}
+					}
 				}
 			}
 		}
@@ -168,6 +201,23 @@ int main()
 				player.moveRight();
 			else
 				player.stopRight();
+
+			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+			{
+				if (gameTimeTotal.asSeconds() - lastShot.asSeconds() > fireRate && bulletsInClip > 0)
+				{
+					// Shoot a bullet
+					bullets[currentBullet].shoot(player.getCenter().x, player.getCenter().y, mouseWorldPosition.x, mouseWorldPosition.y);
+					currentBullet++;
+
+					if (currentBullet > BULLETS_ARRAY_SIZE - 1)
+						currentBullet = 0;
+
+					lastShot = gameTimeTotal;
+
+					bulletsInClip--;
+				}
+			}
 		}
 
 		if (state == GameState::LEVELING_UP) // Choose an upgrade, but only if we are in the leveling up state
@@ -246,11 +296,19 @@ int main()
 			// Align the main view with the player's position, but only if we are in the playing state
 			mainView.setCenter(playerPosition);
 
+			crosshairSprite.setPosition(mouseWorldPosition);
 			// Update the zombies, but only if we are in the playing state
 			for (size_t i { 0 }; i < numZombies; i++)
 			{
 				if (zombies[i].isAlive())
 					zombies[i].update(dtAsSeconds, playerPosition);
+			}
+
+			// Update each bullet if they are in flight mode
+			for (size_t i{ 0 }; i < BULLETS_ARRAY_SIZE; i++)
+			{
+				if(bullets[i].isInFlight())
+					bullets[i].update(dtAsSeconds);
 			}
 		}
 
@@ -263,6 +321,7 @@ int main()
 			window.setView(mainView);
 			window.draw(backgroundVA, &textureBackground);
 			window.draw(player.getSprite());
+			window.draw(crosshairSprite);
 
 			// Draw the zombies, but only if we are in the playing state
 			for (size_t i { 0 }; i < numZombies; i++)
@@ -270,6 +329,14 @@ int main()
 				if (zombies[i].isAlive())
 					window.draw(zombies[i].getSprite());
 			}
+
+
+			// Draw all the bullets wich are in flight mode
+			for (size_t i{ 0 }; i < BULLETS_ARRAY_SIZE; i++)
+			{
+				if(bullets[i].isInFlight())
+					window.draw(bullets[i].getShape());
+			}			
 		}
 		else if(state == GameState::LEVELING_UP)
 		{
