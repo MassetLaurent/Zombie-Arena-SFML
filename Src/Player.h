@@ -5,7 +5,7 @@ class Player
 {
 private:
 	const float		START_SPEED = 200.0f;
-	const float		START_HEALTH = 100;
+	const float		START_HEALTH = 100.f;
 
 	sf::Texture			m_texture;
 	sf::Sprite			m_sprite;
@@ -45,6 +45,7 @@ public:
 	float getRotation() const { return m_sprite.getRotation(); }
 
 	float getHealth() const { return m_health; }
+	float getHealthMax() const { return m_maxHealth; }
 
 	void moveLeft() { m_leftPressed = true; }
 	void moveRight() { m_rightPressed = true; }

@@ -4,7 +4,7 @@
 class Pickup
 {
 private:
-	const int HEALTH_START_VALUE	{ 50 };
+	const int HEALTH_START_VALUE	{ 20 };
 	const int AMMO_START_VALUE		{ 12 };
 	const int START_WAIT_TIME		{ 10 };
 	const int START_SECOND_TO_LIVE	{ 5 };

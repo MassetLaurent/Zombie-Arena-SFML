@@ -45,10 +45,12 @@ void Player::Spawn(sf::IntRect arena, sf::Vector2f resolution, int tileSize)
 	m_resolution = resolution;
 	m_tileSize = tileSize;
 
-	m_healthBar.setSize({ m_health * 2.f,50.f });
+	m_healthBar.setSize({ m_health * 5.f,50.f });
 	m_healthBar.setFillColor(sf::Color::Red);
-	m_healthBar.setPosition(resolution.x / 2.f - m_healthBar.getSize().x / 2, resolution.y - 200);
+	float tempPosX = resolution.x / 2.f - m_healthBar.getGlobalBounds().width / 2.f;
+	m_healthBar.setPosition(tempPosX, resolution.y - 150);
 }
+
 
 void Player::ResetStats()
 {
@@ -99,7 +101,7 @@ void Player::update(float elapsedTime, sf::Vector2i mousePosition)
 	// Convert the angle to degrees and set the player's rotation
 	m_sprite.setRotation((angle * 180) / 3.14159);
 
-	m_healthBar.setSize({ m_health * 2.f,50.f });
+	m_healthBar.setSize({ m_health * 5.f,50.f });
 }
 
 void Player::render(sf::RenderWindow& window)
