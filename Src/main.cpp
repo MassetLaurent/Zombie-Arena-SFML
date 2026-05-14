@@ -82,9 +82,9 @@ int main()
 	gameOverSprite.setPosition(0, 0);
 	gameOverSprite.setScale({resolution.x / gameOverSprite.getTextureRect().width, resolution.y / gameOverSprite.getTextureRect().height });
 
-	sf::Sprite ammoIcon;
-	ammoIcon.setTexture(textureHolder.GetTexture("Res/Textures/ammo_icon.png"));
-	ammoIcon.setPosition(HUD_OFFSET, resolution.y - 150);
+	sf::Sprite hudAmmoIcon;
+	hudAmmoIcon.setTexture(textureHolder.GetTexture("Res/Textures/ammo_icon.png"));
+	hudAmmoIcon.setPosition(HUD_OFFSET, resolution.y - 150);
 
 	// Create the background vertex array, which will be used to draw the background of the arena
 	sf::VertexArray backgroundVA;
@@ -196,15 +196,15 @@ int main()
 	pausedText.setFont(font);
 	pausedText.setCharacterSize(70);
 	pausedText.setFillColor(sf::Color::Yellow);
-	pausedText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
 	pausedText.setString("		PAUSED ! \n\npress Enter to continue !");
+	pausedText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
 
 	sf::Text gameOverText;
 	gameOverText.setFont(font);
 	gameOverText.setCharacterSize(70);
 	gameOverText.setFillColor(sf::Color::Red);
-	gameOverText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
 	gameOverText.setString("Ppress Enter to continue !");
+	gameOverText.setPosition(resolution.x / 2.5f, resolution.y / 8.f);
 
 	sf::Text levelUpText;
 	levelUpText.setFont(font);
@@ -244,7 +244,7 @@ int main()
 	std::stringstream ammoTextSs;
 	ammoTextSs << bulletsInClip << "/" << bulletsSpare;
 	ammoText.setString(ammoTextSs.str());
-	ammoText.setPosition(ammoIcon.getPosition().x + 50.f, ammoIcon.getPosition().y + 7.f);
+	ammoText.setPosition(hudAmmoIcon.getPosition().x + 50.f, hudAmmoIcon.getPosition().y + 7.f);
 
 	sf::Text scoreText;
 	scoreText.setFont(font);
@@ -405,7 +405,7 @@ int main()
 		{
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::Numpad1))
 			{
-				fireRate *=0.9f;
+				fireRate *= 0.9f;
 				state = GameState::PLAYING;
 			}
 			else if(sf::Keyboard::isKeyPressed(sf::Keyboard::Numpad2))
@@ -662,7 +662,7 @@ int main()
 				// ==================== HUD ==================//
 			window.setView(hudView);
 			window.draw(player.getHealthBar());
-			window.draw(ammoIcon);
+			window.draw(hudAmmoIcon);
 			window.draw(ammoText);
 			window.draw(waveText);
 			window.draw(scoreText);

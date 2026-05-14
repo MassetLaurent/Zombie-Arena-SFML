@@ -15,7 +15,7 @@ Pickup::Pickup(int type) :m_type(type)
 			break;
 	}
 
-	m_sprite.setOrigin(25, 25);
+	//m_sprite.setOrigin(25, 25);
 	m_secondsToLive = START_SECOND_TO_LIVE;
 	m_secondsToWait = START_WAIT_TIME;
 }
@@ -40,10 +40,16 @@ void Pickup::spawn()
 {
 	// Spawn pickup item on random location within the arena size
 	srand((int)time(0) / m_type);
-	int x{ rand() % m_Arena.width };
+	int x{ rand() % m_Arena.width - 100};
+
+	if (x < 50)
+		x = 50;
 
 	srand((int)time(0) * m_type);
-	int y{ rand() % m_Arena.height };
+	int y{ rand() % m_Arena.height - 100};
+
+	if (y < 50)
+		y = 50;
 
 	m_secondsSinceSpawn = 0;
 	m_spawned = true;
